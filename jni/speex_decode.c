@@ -21,25 +21,25 @@ int main(int argc, char *argv[])
 {
     FILE         *fin, *fout;
     int           nin, tot_bytes;;
-    short        *sin;
-    char         *bout;
+    char         *bin;
+    short        *sout;
 
     if (argc < 2) {
-	printf("usage: %s InputAudioRawFile OutputBytesFile \n", argv[0]);
-	printf("e.g    %s pcm_s16.raw pcm_bytes.spx\n", argv[0]);
+	printf("usage: %s InputAudioBytesFile OutputRawFile \n", argv[0]);
+	printf("e.g    %s pcm_bytes.spx pcm_s16.raw \n", argv[0]);
 	exit(1);
     }
 
     if (strcmp(argv[1], "-")  == 0) fin = stdin;
     else if ( (fin = fopen(argv[1],"rb")) == NULL ) {
-	fprintf(stderr, "Error opening input raw sample file: %s: %s.\n",
+	fprintf(stderr, "Error opening input bytes file: %s: %s.\n",
          argv[1], strerror(errno));
 	exit(1);
     }
 
     if (strcmp(argv[2], "-") == 0) fout = stdout;
     else if ( (fout = fopen(argv[2],"wb")) == NULL ) {
-	fprintf(stderr, "Error opening output bytes file: %s: %s.\n",
+	fprintf(stderr, "Error opening output raw file: %s: %s.\n",
          argv[2], strerror(errno));
 	exit(1);
     }
@@ -56,21 +56,20 @@ int main(int argc, char *argv[])
 	speex_decoder_ctl(dec_state, SPEEX_GET_FRAME_SIZE, &dec_frame_size);
 
 
-    nin = enc_frame_size;
+    nin = 20;
 
     /* malloc some buffers that are dependant on Nc */
 
-    sin = (short*)malloc(sizeof(short)*enc_frame_size); assert(sin != NULL);
-    bout = (char*)malloc(sizeof(char)*enc_frame_size); assert(bout != NULL);
+    bin = (char*)malloc(sizeof(char)*dec_frame_size); assert(bin != NULL);
+    sout = (short*)malloc(sizeof(short)*dec_frame_size); assert(sout != NULL);
 	tot_bytes = 0;
 
-    while(fread(sin, sizeof(short), nin, fin) == nin)
+    while(fread(bin, sizeof(char), nin, fin) == nin)
     {
-    	speex_bits_reset(&ebits);
-    	speex_encode_int(enc_state, sin, &ebits);
-    	tot_bytes = speex_bits_write(&ebits, (char *)bout, enc_frame_size);    	
+    	speex_bits_read_from(&dbits, bin, nin);
+    	speex_decode_int(dec_state, &dbits, sout);   	
     	
-        fwrite(bout, sizeof(char), tot_bytes, fout);
+        fwrite(sout, sizeof(short), dec_frame_size, fout);
 
 		/* if this is in a pipeline, we probably don't want the usual
 		   buffering to occur */
@@ -84,8 +83,8 @@ int main(int argc, char *argv[])
 
     fclose(fin);
     fclose(fout);
-    free(sin);
-    free(bout);
+    free(bin);
+    free(sout);
 
     speex_bits_destroy(&ebits);
 	speex_bits_destroy(&dbits);
